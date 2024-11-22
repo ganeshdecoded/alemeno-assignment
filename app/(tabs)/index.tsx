@@ -1,74 +1,115 @@
-import { Image, StyleSheet, Platform } from 'react-native';
-
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
+import React, { useState } from 'react';
+import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { parseXMLForm } from '@/utils/xmlParser';
+import { router } from 'expo-router';
+import { DynamicForm } from '@/components/DynamicForm';
+import type { Field } from '@/components/DynamicForm';
 
 export default function HomeScreen() {
+  const [formFields, setFormFields] = useState<Field[] | null>(null);
+  const [error, setError] = useState('');
+
+  const handleFileSelect = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['text/xml', 'application/xml'],
+        copyToCacheDirectory: true
+      });
+      
+      if (result.canceled) {
+        return;
+      }
+
+      if (result.assets && result.assets[0]) {
+        const fileUri = result.assets[0].uri;
+        const fileContent = await FileSystem.readAsStringAsync(fileUri);
+        console.log('File Content:', fileContent);
+        
+        const parsedForm = await parseXMLForm(fileContent);
+        setFormFields(parsedForm);
+        setError('');
+      }
+    } catch (err) {
+      setError('Error loading XML file. Please ensure it\'s a valid XML format.');
+      console.error('File loading error:', err);
+    }
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12'
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          Tap the Explore tab to learn more about what's included in this starter app.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          When you're ready, run{' '}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <ThemedView style={styles.container}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+        <ThemedText style={styles.title}>XML Form Renderer</ThemedText>
+        
+        <TouchableOpacity style={styles.button} onPress={handleFileSelect}>
+          <ThemedText style={styles.buttonText}>Render Form from XML File</ThemedText>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.button} 
+          onPress={() => router.push('/custom-form')}>
+          <ThemedText style={styles.buttonText}>Render Form from XML Input</ThemedText>
+        </TouchableOpacity>
+
+        {error ? (
+          <ThemedText style={styles.error}>{error}</ThemedText>
+        ) : formFields ? (
+          <DynamicForm fields={formFields} />
+        ) : (
+          <ThemedText style={styles.info}>
+            Supported field types:{'\n'}
+            • Text fields{'\n'}
+            • Date/time fields{'\n'}
+            • Radio buttons{'\n'}
+            • Drawing field{'\n\n'}
+            Note: Please select an XML file with the supported field types.
+          </ThemedText>
+        )}
+      </ScrollView>
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  contentContainer: {
+    padding: 16,
+    paddingTop: 60,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#000',
+    marginBottom: 32,
+    textAlign: 'center',
+  },
+  button: {
+    backgroundColor: '#0a7ea4',
+    padding: 16,
+    borderRadius: 4,
     alignItems: 'center',
-    gap: 8,
+    marginBottom: 16,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  buttonText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  error: {
+    color: 'red',
+    marginTop: 16,
   },
-});
+  info: {
+    color: '#000',
+    marginTop: 24,
+    lineHeight: 24,
+  },
+}); 
